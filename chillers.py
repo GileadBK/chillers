@@ -46,6 +46,15 @@ def load_data():
     df = pd.read_csv(file_path)
     if 'Date' in df.columns:
         df['Date'] = pd.to_datetime(df['Date'], format='mixed', dayfirst=True, errors='coerce')
+        # Add missing time-based columns if not present
+        if 'Year' not in df.columns:
+            df['Year'] = df['Date'].dt.year.astype(str)
+        if 'Month' not in df.columns:
+            df['Month'] = df['Date'].dt.strftime('%b')
+        if 'Week' not in df.columns:
+            df['Week'] = df['Date'].dt.isocalendar().week.astype(str)
+        if 'Day' not in df.columns:
+            df['Day'] = df['Date'].dt.strftime('%a')
     return df.drop_duplicates()
 
 @st.cache_data
@@ -394,42 +403,23 @@ def main():
     
     # Calculate metrics
     totalChillerFlow = highest_Chiller = average_Chiller = highest_Chiller_type = totalIncomingVsMain = main_Chiller = "N/A"
-    
+
     if not filtered.empty and metric_cols:
+        # Ensure all metric columns are present and numeric
         for col in metric_cols:
-            filtered[col] = pd.to_numeric(filtered[col], errors='coerce')
-        
-        # Fallback logic for 10T Chiller: use 8T Chiller if 10T is 0 or NaN
-        if "10T Chiller" in filtered.columns:
-            filtered["10T Chiller"] = pd.to_numeric(filtered["10T Chiller"], errors="coerce")
-            if "8T Chiller" in filtered.columns:
-                filtered["10T_or_8T_Chiller"] = filtered["10T Chiller"].where(
-                    (filtered["10T Chiller"].notna()) & (filtered["10T Chiller"] != 0),
-                    filtered["8T Chiller"]
-                )
-            else:
-                filtered["10T_or_8T_Chiller"] = filtered["10T Chiller"]
-        elif "8T Chiller" in filtered.columns:
-            filtered["10T_or_8T_Chiller"] = pd.to_numeric(filtered["8T Chiller"], errors="coerce")
+            if col in filtered.columns:
+                filtered[col] = pd.to_numeric(filtered[col], errors='coerce')
+
+        # Only use metric_cols that exist in filtered
+        valid_metric_cols = [col for col in metric_cols if col in filtered.columns]
+        if valid_metric_cols:
+            meter_totals = filtered[valid_metric_cols].sum(numeric_only=True)
+            highest_Chiller = meter_totals.max()
+            highest_Chiller_type = meter_totals.idxmax()
+            average_Chiller = meter_totals.mean().round(1)
+            totalChillerFlow = meter_totals.sum()
         else:
-            filtered["10T_or_8T_Chiller"] = np.nan
-
-        meter_totals = filtered[metric_cols].sum(numeric_only=True)
-        highest_Chiller = meter_totals.max()
-        highest_Chiller_type = meter_totals.idxmax()
-        average_Chiller = meter_totals.mean().round(1)
-        totalChillerFlow = meter_totals.sum()
-
-        # Use 10T_or_8T_Chiller for main_Chiller and loss calculations
-        main_Chiller = filtered["10T_or_8T_Chiller"].sum()
-        if main_Chiller > 0:
-            loss_percentage = (100 - ((totalChillerFlow / main_Chiller) * 100))
-            totalIncomingVsMain = f"{loss_percentage:.1f}%"
-        else:
-            totalIncomingVsMain = "N/A"
-
-        # Advanced metrics
-        advanced_metrics = calculate_advanced_metrics(filtered, metric_cols)
+            highest_Chiller = average_Chiller = totalChillerFlow = highest_Chiller_type = "N/A"
 
     with col1:
         st.metric(
@@ -606,13 +596,17 @@ def main():
 
         # --- Week over week ---
         if not filtered_data.empty and "Week" in filtered_data.columns and "Year" in filtered_data.columns:
-            # Get current and previous week numbers
+            # Get current and previous week numbers as integers
             current_weeks = filtered_data["Week"].unique()
-            if len(current_weeks) > 0:
-                current_week = max(current_weeks)
-                current_week_data = filtered_data[filtered_data["Week"] == current_week]
+            try:
+                current_weeks_int = sorted([int(w) for w in current_weeks if str(w).isdigit()])
+            except Exception:
+                current_weeks_int = []
+            if len(current_weeks_int) > 0:
+                current_week = current_weeks_int[-1]
+                current_week_data = filtered_data[filtered_data["Week"].astype(int) == current_week]
                 previous_week = current_week - 1
-                previous_week_data = filtered_data[filtered_data["Week"] == previous_week]
+                previous_week_data = filtered_data[filtered_data["Week"].astype(int) == previous_week]
                 current_week_total = current_week_data[Chiller_meter_columns_adv].sum().sum() if not current_week_data.empty else 0
                 previous_week_total = previous_week_data[Chiller_meter_columns_adv].sum().sum() if not previous_week_data.empty else 0
                 if previous_week_total > 0:
@@ -766,24 +760,8 @@ def main():
     if "All" not in selected_months:
         filtered_reg_df = filtered_reg_df[filtered_reg_df["Month"].isin(selected_months)]
     
-    # Add fallback for regression meters as well
-    if "10T Chiller" in filtered_reg_df.columns:
-        filtered_reg_df["10T Chiller"] = pd.to_numeric(filtered_reg_df["10T Chiller"], errors="coerce")
-        if "8T Chiller" in filtered_reg_df.columns:
-            filtered_reg_df["10T_or_8T_Chiller"] = filtered_reg_df["10T Chiller"].where(
-                (filtered_reg_df["10T Chiller"].notna()) & (filtered_reg_df["10T Chiller"] != 0),
-                filtered_reg_df["8T Chiller"]
-            )
-        else:
-            filtered_reg_df["10T_or_8T_Chiller"] = filtered_reg_df["10T Chiller"]
-    elif "8T Chiller" in filtered_reg_df.columns:
-        filtered_reg_df["10T_or_8T_Chiller"] = pd.to_numeric(filtered_reg_df["8T Chiller"], errors="coerce")
-    else:
-        filtered_reg_df["10T_or_8T_Chiller"] = np.nan
 
     regression_meters = [col for col in metric_cols if col in filtered_reg_df.columns]
-    if "10T_or_8T_Chiller" in filtered_reg_df.columns and "10T Chiller" in regression_meters:
-        regression_meters = [col if col != "10T Chiller" else "10T_or_8T_Chiller" for col in regression_meters]
 
     if regression_meters and "CDD 15.5" in filtered_reg_df.columns:
         col_reg1, col_reg2 = st.columns([3, 1])
