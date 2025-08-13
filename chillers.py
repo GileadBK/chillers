@@ -390,7 +390,7 @@ def main():
     # ========== SECTION 1: KEY PERFORMANCE INDICATORS ==========
     st.markdown('<div class="section-header">Key Performance Indicators</div>', unsafe_allow_html=True)
     
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, col4 = st.columns(4)
     
     # Calculate metrics
     totalChillerFlow = highest_Chiller = average_Chiller = highest_Chiller_type = totalIncomingVsMain = main_Chiller = "N/A"
@@ -455,18 +455,7 @@ def main():
             f"{average_Chiller:,.0f}" if isinstance(average_Chiller, (int, float)) else "N/A",
             border=True
         )
-    with col5:
-        st.metric(
-            "Used/Incoming Loss %", 
-            totalIncomingVsMain,
-            border=True
-        )
-    with col6:
-        st.metric(
-            "10T/8T Chiller Total (Kg)",
-            f"{main_Chiller:,.0f}" if isinstance(main_Chiller, (int, float)) else main_Chiller,
-            border=True
-        )
+
 
     # ========== SECTION 2: TIME SERIES ANALYSIS ========== 
     st.markdown('<div class="section-header">Time Series Analysis</div>', unsafe_allow_html=True)
