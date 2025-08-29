@@ -46,7 +46,7 @@ def clean_and_update_chiller_data(input_dir='csvs'):
     combined['Day'] = pd.to_datetime(combined['Date']).dt.strftime('%a')
 
     # Output detailed file (like steam.csv)
-    detailed_cols = ['Timestamp', 'Date', 'Time', 'Year', 'Month', 'Week', 'Day', 'CDD 15.5', 'Chiller 03 2Q3', 'Chiller 02 2Q9', 'Chiller 01 2Q10', 'Chiller CH-WC07301']
+    detailed_cols = ['Timestamp', 'Date', 'Time', 'Year', 'Month', 'Week', 'Day', 'CDD 5.5', 'Chiller 03 2Q3', 'Chiller 02 2Q9', 'Chiller 01 2Q10', 'Chiller CH-WC07301']
     combined = combined[detailed_cols]
 
 
@@ -58,10 +58,10 @@ def clean_and_update_chiller_data(input_dir='csvs'):
     meter_cols = ['Chiller 03 2Q3', 'Chiller 02 2Q9', 'Chiller 01 2Q10', 'Chiller CH-WC07301']
     summed = combined.groupby('Date', as_index=False)[meter_cols].sum(numeric_only=True)
     # Get CDD value for each date (first value for that date)
-    CDD_vals = combined.groupby('Date', as_index=False)['CDD 15.5'].first()
+    CDD_vals = combined.groupby('Date', as_index=False)['CDD 5.5'].first()
     summed = pd.merge(summed, CDD_vals, on='Date', how='left')
     # Reorder columns to match steam summary style
-    summary_cols = ['Date'] + meter_cols + ['CDD 15.5']
+    summary_cols = ['Date'] + meter_cols + ['CDD 5.5']
     summed = summed[summary_cols]
 
     if os.path.exists(sum_output_file):
