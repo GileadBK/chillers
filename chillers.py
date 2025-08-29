@@ -68,7 +68,7 @@ def load_regression_data():
     return reg_df
 
 def get_Chiller_meter_columns(df):
-    additional_excludes = ["CDD 15.5", "CDD15.5", "CDD"]
+    additional_excludes = ["CDD 5.5", "CDD15.5", "CDD"]
     all_excludes = EXCLUDE_COLS + additional_excludes
     return [col for col in df.columns if col not in all_excludes and pd.api.types.is_numeric_dtype(df[col])]
 
@@ -254,9 +254,9 @@ def apply_filters(df, date_range=None, selected_years=None, selected_months=None
         # Add selected meter columns
         cols_to_keep.extend(selected_meter_cols)
         
-        # Always keep CDD 15.5 for regression analysis (but not for plotting)
-        if "CDD 15.5" in filtered.columns:
-            cols_to_keep.append("CDD 15.5")
+        # Always keep CDD 5.5 for regression analysis (but not for plotting)
+        if "CDD 5.5" in filtered.columns:
+            cols_to_keep.append("CDD 5.5")
         
         # Only filter columns if we have valid selections
         if selected_meter_cols:
@@ -361,7 +361,7 @@ def clean_and_update_Chiller_data(input_dir='csvs'):
     combined = pd.merge(Chillers, CDD, on='Date', how='inner')
 
     # Only keep columns that exist and have values
-    keep_cols = ['Timestamp', 'Date', 'Time', 'CDD 15.5', 'Chiller 03 2Q3', 'Chiller 02 2Q9', 'Chiller 01 2Q10', 'Chiller CH-WC07301']
+    keep_cols = ['Timestamp', 'Date', 'Time', 'CDD 5.5', 'Chiller 03 2Q3', 'Chiller 02 2Q9', 'Chiller 01 2Q10', 'Chiller CH-WC07301']
     keep_cols = [col for col in keep_cols if col in combined.columns]
     combined = combined[keep_cols]
 
@@ -372,10 +372,10 @@ def clean_and_update_Chiller_data(input_dir='csvs'):
     # Prepare summary: sum by date, keep CDD for each date
     meter_cols = [col for col in ['Chiller 03 2Q3', 'Chiller 02 2Q9', 'Chiller 01 2Q10', 'Chiller CH-WC07301'] if col in combined.columns]
     summed = combined.groupby('Date', as_index=False)[meter_cols].sum(numeric_only=True)
-    if 'CDD 15.5' in combined.columns:
-        CDD_vals = combined.groupby('Date', as_index=False)['CDD 15.5'].first()
+    if 'CDD 5.5' in combined.columns:
+        CDD_vals = combined.groupby('Date', as_index=False)['CDD 5.5'].first()
         summed = pd.merge(summed, CDD_vals, on='Date', how='left')
-        summary_cols = ['Date'] + meter_cols + ['CDD 15.5']
+        summary_cols = ['Date'] + meter_cols + ['CDD 5.5']
     else:
         summary_cols = ['Date'] + meter_cols
     summed = summed[summary_cols]
@@ -763,7 +763,7 @@ def main():
 
     regression_meters = [col for col in metric_cols if col in filtered_reg_df.columns]
 
-    if regression_meters and "CDD 15.5" in filtered_reg_df.columns:
+    if regression_meters and "CDD 5.5" in filtered_reg_df.columns:
         col_reg1, col_reg2 = st.columns([3, 1])
         
         with col_reg2:
@@ -785,13 +785,13 @@ def main():
                 
                 fig_reg = px.scatter(
                     filtered_reg_df,
-                    x="CDD 15.5",
+                    x="CDD 5.5",
                     y=selected_reg_meter,
                     color=color_col,
                     trendline="ols",
                     hover_data=["Date"],
-                    title=f"{selected_reg_meter} vs CDD 15.5",
-                    labels={"CDD 15.5": "Heating Degree Days (15.5°C)", selected_reg_meter: "Chiller Usage"}
+                    title=f"{selected_reg_meter} vs CDD 5.5",
+                    labels={"CDD 5.5": "Heating Degree Days (15.5°C)", selected_reg_meter: "Chiller Usage"}
                 )
                 fig_reg.update_layout(
                     template="plotly_white",
@@ -803,12 +803,12 @@ def main():
     
                  
                 valid_data = filtered_reg_df[
-                    filtered_reg_df["CDD 15.5"].notna() & 
+                    filtered_reg_df["CDD 5.5"].notna() & 
                     filtered_reg_df[selected_reg_meter].notna()
                 ]
                 
                 if len(valid_data) > 1:
-                    X = sm.add_constant(valid_data["CDD 15.5"])
+                    X = sm.add_constant(valid_data["CDD 5.5"])
                     y = valid_data[selected_reg_meter]
                     model = sm.OLS(y, X).fit()
                     
@@ -823,7 +823,7 @@ def main():
                             month_data = valid_data[valid_data["Month"] == month]
                             if len(month_data) > 2:  # Need at least 3 points for meaningful regression
                                 try:
-                                    X_month = sm.add_constant(month_data["CDD 15.5"])
+                                    X_month = sm.add_constant(month_data["CDD 5.5"])
                                     y_month = month_data[selected_reg_meter]
                                     model_month = sm.OLS(y_month, X_month).fit()
                                     r2_month = model_month.rsquared
